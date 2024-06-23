@@ -1,0 +1,617 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Canvas, naves espaciales</title>
+    <style>
+        body {
+            width: 960px;
+            margin: 0 auto;
+            text-align: center;   
+        }
+
+        canvas {
+            background: black;
+            border: solid blue 3px;
+            /* Ajusta el tamaño del canvas según necesites */
+            width: 100%;
+            height: 600px; /* Por ejemplo, ajusta la altura del canvas */
+            
+        }
+
+        .menu-container {
+            display: none;
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background-color: rgba(0, 0, 0, 0.8);
+            padding: 20px;
+            color: white;
+            border-radius: 10px;
+            z-index: 1000;
+        }
+
+        .menu-container h2, .menu-container p {
+            margin: 10px 0;
+        }
+
+        .menu-container button {
+            padding: 10px 20px;
+            font-size: 16px;
+            cursor: pointer;
+            background-color: #4CAF50;
+            border: none;
+            color: white;
+            border-radius: 5px;
+        }
+         /* Estilos adicionales para el botón de reinicio */
+        #restartButton {
+    position: absolute;
+    top: calc(50% + 100px); /* Ajusta la posición vertical según necesites */
+    left: 50%;
+    transform: translateX(-50%);
+    margin-top: 20px; /* Espacio entre el botón y el texto */
+}
+
+    </style>
+    <script>
+
+  // Definición de variables y funciones del juego (debe estar antes de la función toggleSound)
+  let soundEnabled = true; // Variable para controlar el estado del sonido
+  let velocidadEnemigos = 10; // Velocidad inicial de los enemigos
+
+// Resto del código del juego...
+
+let game = {
+    canvas: null,
+    ctx: null,
+    imagen: null,
+    caratula: true,
+    imagenEnemigo: null,
+    teclaPulsada: null,
+    tecla: [],
+    colorBala: "white",
+    colorBala2: "red",
+    balas_array: new Array(),
+    balasEnemigas_array: new Array(),
+    enemigos_array: new Array(),
+    disparo: false,
+    puntos: 0,
+    finjuego: false,
+    boing:null,
+    disparoJugador:null,
+    intro:null,
+    fin:null,
+    jugador:null,
+    x:0,
+}
+
+/***Constantes que hacen referencias a nuestros botones, valores que no cambian****/
+const KEY_ENTER =13;
+const KEY_LEFT =37;
+const KEY_UP =38;
+const KEY_RIGHT =39;
+const KEY_DOWN =40;
+const BARRA =32;
+
+/***Objetos (primera funcion bala***/
+
+function Bala(x, y, w) {
+    this.x = x;
+    this.y = y;
+    this.w = w;
+    this.dibujar = function() {
+        // Guardar el estado actual del contexto
+        game.ctx.save();
+
+        // Establecer el color de relleno para la bala
+        game.ctx.fillStyle = game.colorBala;
+
+        // Dibujar un rectángulo para representar la bala
+        game.ctx.fillRect(this.x, this.y, this.w, this.w);
+
+        // Actualizar la posición de la bala para simular movimiento hacia arriba
+        this.y = this.y - 4;
+
+        // Restaurar el estado anterior del contexto
+        game.ctx.restore();
+    };
+
+    this.disparar = function() {
+        game.ctx.save();
+        game.ctx.fillStyle = game.colorBala2;
+        game.ctx.fillRect(this.x, this.y, this.w, this.w);
+        this.y = this.y + 6;           ///bala hacia bajo
+        game.ctx.restore();
+    };
+
+}
+
+function Jugador(x) {
+            this.x = x;
+            this.y = 450;
+            this.w= 30;
+            this.h= 15;
+            this.dibujar = function (x) {
+                this.x = x;
+                game.ctx.drawImage(game.imagen, this.x, this.y,this.w, this.h);
+            };
+    }
+    
+    
+    
+    function Enemigo(x, y) {
+
+    this.x = x;            // Posición inicial en el eje x
+    this.y = y;            // Posición inicial en el eje y
+    this.w = 35;           // Ancho del enemigo
+    this.veces = 0;        // Contador para controlar los saltos
+    this.dx = 15;           // Velocidad inicial en el eje x
+    this.ciclos = 0;       // Contador de ciclos para el retraso
+    this.num = 14;         // Número máximo de saltos
+    this.figura = true;    // Variable para alternar entre figuras
+    this.vive = true;      // Estado de vida del enemigo
+
+    this.dibujar = function () { 
+// Lógica para el movimiento y dibujo del enemigo
+
+        // Retraso para controlar la velocidad de movimiento
+        if(this.ciclos > 30) {
+            ///saltitos
+            if(this.veces > this.num) {
+                this.dx *= -1;          // Invertir la dirección horizontal
+                this.veces = 0;         // Reiniciar contador de saltos
+                this.num = 130;          // Actualizar número máximo de saltos
+                this.y += 30;           // Mover hacia abajo
+                this.dx = (this.dx>0)? this.dx++:this.dx--; ///operador ternario
+            }else{
+                    // Movimiento horizontal normal
+            if (this.x + this.dx > 0 && this.x + this.dx < game.canvas.width - this.w) {
+                this.x += this.dx;  // Mover horizontalmente si no se sale de los límites
+            } else {
+                this.dx *= -1;      // Invertir la dirección si alcanza el borde izquierdo o derecho
+                this.y += 20;       // Bajar una fila
+            }
+            }
+            this.veces++;               // Incrementar contador de saltos
+            this.ciclos = 0;            // Reiniciar contador de ciclos
+            this.figura = !this.figura; // Alternar entre figuras
+
+        }else{
+            this.ciclos++;              // Incrementar contador de ciclos
+        }
+        if(this.figura){
+            game.ctx.drawImage(game.imagenEnemigo,0,0,40,30, this.x,this.y,35,30);
+        }else{
+            game.ctx.drawImage(game.imagenEnemigo, 50, 0, 35, 30, this.x, this.y, 35, 30);
+        }
+        
+    }
+}
+const inicializarEnemigos = (velocidad) => {
+    game.enemigos_array = [];
+    for (let i = 0; i < 5; i++) {
+        for (let j = 0; j < 10; j++) {
+            game.enemigos_array.push(new Enemigo(100 + 40 * j, 30 + 45 * i));
+        }
+    }
+    // Ajustar la velocidad de los enemigos
+    game.enemigos_array.forEach(enemigo => {
+        enemigo.dx = velocidad; // Ajustar la velocidad dx de los enemigos
+        enemigo.num = 115; // Ajustar el número de saltos
+    });
+};
+
+
+const verificarEnemigosEliminados = () => {
+    return game.enemigos_array.every(enemigo => enemigo === null || !enemigo.vive);
+    if (todosEliminados) {
+        // Si todos los enemigos han sido eliminados, reiniciarlos con mayor velocidad
+        velocidadEnemigos *2; // Aumentar la velocidad en unidades
+        reiniciarEnemigos(velocidadEnemigos); // Llamar a la función para reiniciar enemigos
+    }
+
+    return todosEliminados;
+};
+
+
+
+
+
+
+/**funciones caratula**/
+
+const caratula = () => {
+        let imagen = new Image();
+        imagen.src = "imagenes/cara.webp";
+        imagen.onload = () => {
+            game.ctx.drawImage(imagen, 0, 0);
+        }
+}
+
+const seleccionar = (e) => {
+    if(game.caratula){
+        inicio();
+    }
+}
+
+const inicio = () =>{
+    game.ctx.clearRect(0, 0, game.canvas.width, game.canvas.height);
+    game.caratula = false;
+    game.jugador = new Jugador(0);
+    game.x = game.canvas.width / 2;
+    game.jugador.dibujar(game.x);
+    game.puntos = 0;
+    game.finjuego = false;
+    game.balas_array = [];
+    game.enemigos_array = [];
+
+    // Crear nuevos enemigos
+    // for (var i = 0; i < 5; i++) {
+      //   for (var j = 0; j < 10; j++) {
+        //     game.enemigos_array.push(new Enemigo(100 + 40 * j, 30 + 45 * i));
+     //    }
+   // }
+    
+    inicializarEnemigos(velocidadEnemigos);
+    animar();
+}
+
+//var x = 100, y = 100;
+
+const animar = () =>{
+    if (!game.finjuego) {
+                requestAnimationFrame(animar);
+                verificar();
+                pintar();
+                colisiones();
+            }
+        };
+
+const colisiones=()=>{
+    let enemigo , bala;
+    for(var i=0;i<game.enemigos_array.length;i++){
+        for(var j=0; j<game.balas_array.length;j++){
+            enemigo = game.enemigos_array[i];
+            bala = game.balas_array[j];
+
+            if(enemigo !=null && bala !=null){
+                if((bala.x>enemigo.x)&&
+                (bala.x < enemigo.x + enemigo.w) &&
+                (bala.y>enemigo.y)&&
+                (bala.y < enemigo.y + enemigo.w)) {
+                    enemigo.vive=false;
+                    game.enemigos_array[i] = null;
+                    game.balas_array[j] = null;
+                    game.disparo = false;
+                    game.puntos += 10; 
+                    game.boing.play();   //play para que suene
+                    break;
+                }
+                
+    }
+            }
+        }
+        // Verificar si todos los enemigos han sido eliminados
+        if (verificarEnemigosEliminados()) {
+        // Reiniciar los enemigos con mayor velocidad
+                ///velocidadEnemigos += 1; // Incrementar la velocidad en unidades
+                inicializarEnemigos(velocidadEnemigos);
+    }
+
+    ///colisiones balas enemigas, cuando dañan al jugador.
+    for (let j = 0; j < game.balasEnemigas_array.length; j++) {
+        bala = game.balasEnemigas_array[j];
+
+        ///indicar que nos han dañado los enemigos
+        if(bala!=null){
+            if((bala.x > game.jugador.x)&&
+            (bala.x < game.jugador.x + game.jugador.w) &&
+            (bala.y > game.jugador.y)&&
+            (bala.y < game.jugador.y + game.jugador.h)){
+
+                gameOver();
+
+            }
+
+        }
+
+    }
+
+};
+
+const gameOver = ()=>{
+    game.ctx.clearRect(0, 0, game.canvas.width, game.canvas.height);
+    game.balas_array =  [];
+    game.enemigos_array = [];
+    game.balasEnemigas_array = [];
+    game.finjuego=true;
+    game.fin.play();
+
+    mensaje("Game Over",100,100);
+    mensaje("Obtuviste "+ game.puntos +" puntos ",220,50);
+
+     ///mostrar contenido de Game Over y reiniciar boton
+    document.querySelector('.menu-container').style.display = 'block';
+    document.getElementById('gameScore').innerText = "Obtuviste " + game.puntos + " puntos";
+    }
+
+    const mostrarMensajeFin = () => {
+            const gameOverMenu = document.querySelector(".menu-container");
+            gameOverMenu.style.display = "block";
+            const restartButton = document.getElementById("restartButton");
+            restartButton.addEventListener("click", reiniciarJuego);
+        };
+
+const reiniciarJuego = () => {
+            // Ocultar el contenedor de Game Over y reiniciar el juego
+            document.querySelector('.menu-container').style.display = 'none';
+            game.finjuego = false;
+            game.puntos = 0;
+            inicio();
+        }
+
+
+
+const mensaje = (cadena,y,tamano=100) =>{
+    let medio = (game.canvas.width)/2;
+    game.ctx.save();
+    game.ctx.fillStyle ="yellow";
+    game.ctx.strokestyle = "blue";
+    game.ctx.textBaseline = "top";
+    game.ctx.font ="bold " + tamano + "px Courier";
+    game.ctx.textAlign ="center";
+    game.ctx.fillText(cadena, medio, y);
+    game.ctx.restore();
+
+}
+
+
+const verificar = () =>{
+    if(game.tecla[KEY_RIGHT]) {game.x += 10}; /** Mover cañon derecha**/
+    if(game.tecla[KEY_LEFT]) {game.x -= 10}; /** Mover cañon izquierda**/
+   
+    //verificacion de cañon
+    if(game.x>game.canvas.width -10) {game.x = game.canvas.width -10};
+    if(game.x<0){game.x = 10};
+
+
+    // Disparo
+    if (game.tecla[BARRA]) {
+        if(game.disparo==false){
+            game.balas_array.push(new Bala(game.jugador.x + 12, game.jugador.y - 3, 5));
+            game.tecla[BARRA] = false;
+            game.disparo = false;
+            game.disparoJugador.play();
+        }
+
+    }
+    ///disparo de enemigo, para que se ejecute la funcion
+    if(Math.random()>0.96){
+        dispararEnemigo();
+    }
+
+
+}
+
+//funcion para que solo disparen los 10 primeros enemigos
+const dispararEnemigo = ()=>{
+    var ultimos = new Array();
+///bucle en retroceso
+    for(var i = game.enemigos_array.length-1;i>0;i--){
+        if(game.enemigos_array[i]!=null){
+            ultimos.push(i);
+        }
+        if(ultimos.length==10)break;
+    }
+    d = ultimos[Math.floor(Math.random()*10)]; ///de forma aleatorio disparan 10
+
+    game.balasEnemigas_array.push(new Bala(game.enemigos_array[d].x+game.enemigos_array[d].w/2,game.enemigos_array[d].y,5));
+
+}
+
+    
+
+const pintar = ()=>{
+    game.ctx.clearRect(0, 0, game.canvas.width, game.canvas.height);
+            game.jugador.dibujar(game.x);
+            game.balas_array = game.balas_array.filter(bala => bala !== null);
+            game.balasEnemigas_array = game.balasEnemigas_array.filter(bala => bala !== null);
+            game.balas_array.forEach(bala => bala.dibujar());
+            game.balasEnemigas_array.forEach(bala => bala.disparar());
+            game.enemigos_array.forEach(enemigo => {
+                if (enemigo != null) enemigo.dibujar();
+            });
+
+            game.ctx.save();
+            game.ctx.font = "20px Courier New";
+            game.ctx.fillStyle = "white";
+            game.ctx.fillText("Puntos: " + game.puntos, 8, 20);
+            game.ctx.restore();
+        };
+
+
+  ///  game.ctx.clearRect(0, 0, game.canvas.width, game.canvas.height);
+
+   /// score();
+
+  ///  game.jugador.dibujar(game.x); ///llama al cañoncito
+
+
+    //**Mover balas*//
+    for(var i=0;i<game.balas_array.length;i++){
+
+        if(game.balas_array[i]!= null){
+            game.balas_array[i].dibujar();
+            if(game.balas_array[i].y<0) {
+                game.disparo = false;           ////hace que las balas salgan de una en una
+                game.balas_array[i]=null;
+            }
+    }
+}
+    
+///balas enemigas
+    for (var i = 0; i < game.balasEnemigas_array.length; i++) {
+        if(game.balasEnemigas_array[i] != null) {
+            game.balasEnemigas_array[i].disparar();
+            if(game.balasEnemigas_array[i].y > game.canvas.height){
+                game.balasEnemigas_array[i]=null
+           }
+        }
+    }
+
+
+        
+    // ejemplo de la bolita:/game.ctx.fillstyle = "black";
+   /// game.ctx.beginPath();
+    ///game.ctx.arc(x, y, 5, 0, 2 * Math.PI);
+    ///game.ctx.fill();
+
+///enemigos
+    for(var i=0; i<game.enemigos_array.length;i++){
+       if(game.enemigos_array[i]!=null){
+            game.enemigos_array[i].dibujar();
+        }
+        
+    }
+
+
+
+const score=()=>{
+    game.ctx.save();
+    game.ctx.fillStyle = "white";
+    game.ctx.font = "bold 20px Courier";
+    game.ctx.fillText("SCORE:" + game.puntos, 10,20);
+    game.ctx.restore();
+
+}
+
+
+
+
+///necesitamos que los botones esten a la escucha de nuestros dedos
+/**listener**/
+document.addEventListener("keydown",function(e){
+    game.teclaPulsada=e.keyCode;
+    game.tecla[e.keyCode]= true;
+
+});
+
+document.addEventListener("keyup", function (e) {
+    game.tecla[e.keyCode] = false;
+
+});
+
+
+    window.requestAnimationFrame = (function(){
+        return window.requestAnimationFrame ||
+        window.webkitRequestAnimationFrame ||
+        window.mozRequestAnimationFrame ||
+        function (callback) { window.setTimeout(callback, 17); }
+    })();
+
+
+window.onload=function(){
+    game.canvas = document.getElementById("canvas");
+    if(game.canvas && game.canvas.getContext){
+        game.ctx = game.canvas.getContext("2d");
+        if(game.ctx) {
+
+            ///sonidos
+            game.boing = document.getElementById("boing");
+            game.disparoJugador = document.getElementById("disparo");
+            game.intro = document.getElementById("intro");
+            game.fin = document.getElementById("fin");
+
+            game.imagen = new Image();
+            game.imagen.src="imagenes/torre.fw.png"
+            
+///crear enemigos.
+            game.imagenEnemigo = new Image();
+            game.imagenEnemigo.src = "imagenes/invader.fw.png";
+            game.imagenEnemigo.onload = function(){
+                for(var i=0 ; i<5; i++){
+                    for(var j=0; j<10; j++){
+                    game.enemigos_array.push(new Enemigo(100+40*j , 30+45*i));
+                }
+            }
+        }
+            caratula();
+            game.canvas.addEventListener("click", seleccionar,false);
+
+        }else{
+            alert("No cuentas con canvas")
+        };
+    }
+    // Agregar evento al botón de reinicio
+    document.getElementById('restartButton').addEventListener('click', reiniciarJuego);
+    
+    // Definición de la función para alternar el sonido
+    const toggleSound = () => {
+            if (soundEnabled) {
+                // Desactivar sonido
+                soundEnabled = false;
+                game.boing.muted = true;
+                game.disparoJugador.muted = true;
+                game.intro.muted = true;
+                game.fin.muted = true;
+                document.getElementById('toggleSoundButton').innerText = 'Activar Sonido';
+            } else {
+                // Activar sonido
+                soundEnabled = true;
+                game.boing.muted = false;
+                game.disparoJugador.muted = false;
+                game.intro.muted = false;
+                game.fin.muted = false;
+                document.getElementById('toggleSoundButton').innerText = 'Silenciar Sonido';
+            }
+        }
+
+        // Evento click para el botón de silenciar/activar sonido
+        document.getElementById('toggleSoundButton').addEventListener('click', toggleSound);
+
+        // Evento click para el botón de reinicio
+        document.getElementById('restartButton').addEventListener('click', reiniciarJuego);
+        
+        inicializarEnemigos(velocidadEnemigos);
+
+}
+
+    </script>
+</head>
+<body>
+    <h1>Dispara al alíen</h1>
+    <canvas id="canvas" width="960" height="500">
+        Tu nsvegador no soporta el canvas de HTML5
+    </canvas>
+
+   <!-- Contenedor para el menú de inicio y Game Over -->
+   <div class="menu-container">
+    <h2>Game Over</h2>
+    <p id="gameScore">Obtuviste 0 puntos</p>
+    <button id="restartButton">Reiniciar</button>
+    </div>
+    <button id="toggleSoundButton">Silenciar Sonido</button> <!-- Botón para silenciar/activar sonido --> 
+
+    <audio id="boing">
+        <source src="sonidos/boing.mp3">
+        <source src="sonidos/boing.ogg">
+    </audio>
+    <audio id="disparo">
+        <source src="sonidos/disparo.mp3">
+        <source src="sonidos/disparo.ogg">
+    </audio>
+    <audio id="intro">
+        <source src="sonidos/intro.mp3">
+        <source src="sonidos/intro.ogg">
+    </audio>
+    <audio id="fin">
+        <source src="sonidos/gameOver.mp3">
+        <source src="sonidos/gameOver.ogg">
+    </audio>
+
+    
+</body>
+</html>
